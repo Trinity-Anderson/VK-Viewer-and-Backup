@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK Chat Viewer Pro</title>
+    <style>
+        :root {
+            --bg: #edeef0;
+            --surface: #ffffff;
+            --text: #000000;
+            --text-secondary: #6d7885;
+            --border: #dce1e6;
+            --msg-in-bg: #ffffff;
+            --msg-out-bg: #cce4ff;
+            --msg-in-text: #000000;
+            --msg-out-text: #000000;
+            --reply-bg: #f0f2f5;
+            --reply-border: #5181b8;
+            --fwd-bg: #f7f8fa;
+            --fwd-border: #aebcc9;
+            --avatar-in-bg: #aebcc9;
+            --avatar-out-bg: #6faee3;
+            --accent: #5181b8;
+            --shadow: 0 2px 6px rgba(0,0,0,0.08);
+            --bubble-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.dark {
+            --bg: #1a1a1a;
+            --surface: #2c2c2c;
+            --text: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border: #3a3a3a;
+            --msg-in-bg: #2c2c2c;
+            --msg-out-bg: #3a4c5e;
+            --msg-in-text: #e0e0e0;
+            --msg-out-text: #e0e0e0;
+            --reply-bg: #242424;
+            --reply-border: #6faee3;
+            --fwd-bg: #262626;
+            --fwd-border: #5c6b79;
+            --avatar-in-bg: #4a5568;
+            --avatar-out-bg: #3b7cb8;
+            --accent: #6faee3;
+            --shadow: 0 4px 12px rgba(0,0,0,0.3);
+            --bubble-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            transition: background var(--transition);
+        }
+        .viewer {
+            width: 100%;
+            max-width: 750px;
+            height: 92vh;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background var(--transition), box-shadow var(--transition);
+        }
+        .toolbar {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            transition: background var(--transition);
+            z-index: 10;
+        }
+        .file-button, .settings-button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all var(--transition);
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .file-button:hover, .settings-button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+        .toolbar label {
+            font-size: 14px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            transition: color var(--transition);
+        }
+        .toolbar input[type="file"] { display: none; }
+        .toolbar input[type="number"] {
+            width: 110px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            background: var(--bg);
+            color: var(--text);
+            transition: all var(--transition);
+        }
+        .search-box {
+            flex: 1;
+            min-width: 140px;
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 14px;
+            outline: none;
+            background: var(--bg);
+            color: var(--text);
+            transition: all var(--transition);
+        }
+        .search-box:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(81,129,184,0.2);
+        }
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: var(--bg);
+            transition: background var(--transition);
+            scroll-behavior: smooth;
+        }
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -360px;
+            width: 340px;
+            height: 100vh;
+            background: var(--surface);
+            box-shadow: -5px 0 25px rgba(0,0,0,0.2);
+            padding: 24px 20px;
+            z-index: 1000;
+            transition: right var(--transition);
+            overflow-y: auto;
+        }
+        .settings-panel.open { right: 0; }
+        .settings-panel h3 {
+            margin-bottom: 20px;
+            color: var(--text);
+            font-weight: 600;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+        .setting-row select, .setting-row input[type="range"] {
+            width: 130px;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+        }
+        .setting-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition);
+        }
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .message-wrapper {
+            display: flex;
+            flex-direction: column;
+            max-width: 82%;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: opacity 0.28s ease, transform 0.28s ease;
+        }
+        .message-wrapper.reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .message-wrapper.in {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+        .message-wrapper.out {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+        .message-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            width: 100%;
+        }
+        .message-wrapper.out .message-row { flex-direction: row-reverse; }
+        .avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--avatar-in-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: white;
+            flex-shrink: 0;
+            transition: all var(--transition);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .out .avatar { background: var(--avatar-out-bg); }
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            position: relative;
+            box-shadow: var(--bubble-shadow);
+            transition: all var(--transition);
+        }
+        .in .bubble {
+            background: var(--msg-in-bg);
+            color: var(--msg-in-text);
+            border-bottom-left-radius: 6px;
+        }
+        .out .bubble {
+            background: var(--msg-out-bg);
+            color: var(--msg-out-text);
+            border-bottom-right-radius: 6px;
+        }
+        .time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 3px;
+            padding: 0 10px;
+            transition: color var(--transition);
+        }
+        .date-separator {
+            text-align: center;
+            margin: 14px 0 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+        .reply-block {
+            background: var(--reply-bg);
+            border-left: 3px solid var(--reply-border);
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text);
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            transition: all var(--transition);
+        }
+        .reply-block .mini-avatar {
+            font-size: 16px;
+            line-height: 1;
+        }
+        .fwd-block {
+            margin-top: 8px;
+            border-left: 3px solid var(--fwd-border);
+            padding: 6px 10px;
+            background: var(--fwd-bg);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text);
+            transition: all var(--transition);
+        }
+        .attachment {
+            margin-top: 6px;
+            font-size: 13px;
+            color: var(--accent);
+        }
+        .sticker-img {
+            display: block;
+            max-width: 120px;
+            max-height: 120px;
+            margin: 6px 0 2px;
+            border-radius: 8px;
+            transition: transform 0.2s;
+            pointer-events: none;
+        }
+        .sticker-img:hover { transform: scale(1.05); }
+        .empty-chat {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 60px;
+            font-size: 16px;
+        }
+        .msg-timestamp {
+            font-size: 11px;
+            color: var(--text-secondary);
+            opacity: 0.8;
+            margin-left: 6px;
+        }
+        button, input, select { font-family: inherit; }
+    </style>
+</head>
+<body>
+<div class="viewer">
+    <div class="toolbar">
+        <input type="file" id="fileInput" accept=".json,.txt">
+        <button class="file-button" onclick="document.getElementById('fileInput').click()">📂 JSON</button>
+        <label>Мой ID: <input type="number" id="myIdInput" placeholder="355255291"></label>
+        <label><input type="checkbox" id="useOutCheckbox" checked> out</label>
+        <input type="text" class="search-box" id="searchInput" placeholder="🔍 Поиск...">
+        <button class="settings-button" id="settingsBtn">⚙️</button>
+        <small id="messageCount" style="color: var(--text-secondary);"></small>
+    </div>
+    <div class="chat-container" id="chatContainer">
+        <div class="empty-chat">Загрузите JSON-файл с сообщениями ВКонтакте</div>
+    </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="settings-panel" id="settingsPanel">
+    <h3>Настройки отображения</h3>
+    <div class="setting-row">
+        <span>Тема</span>
+        <select id="themeSelect">
+            <option value="light">Светлая</option>
+            <option value="dark">Тёмная</option>
+        </select>
+    </div>
+    <div class="setting-row">
+        <span>Размер шрифта</span>
+        <input type="range" id="fontSizeRange" min="13" max="20" value="15" step="1">
+    </div>
+    <div class="setting-row">
+        <span>Ширина пузырька</span>
+        <input type="range" id="bubbleWidthRange" min="65" max="90" value="82" step="5">
+    </div>
+    <div class="setting-row">
+        <span>Аватары</span>
+        <input type="checkbox" id="showAvatarsCheckbox" checked>
+    </div>
+    <div class="setting-row">
+        <span>Аватары-эмодзи</span>
+        <input type="checkbox" id="useEmojiAvatarsCheckbox" checked>
+    </div>
+    <div class="setting-row">
+        <span>Показывать reply</span>
+        <input type="checkbox" id="showReplyCheckbox" checked>
+    </div>
+    <div class="setting-row">
+        <span>Показывать пересылаемые</span>
+        <input type="checkbox" id="showFwdCheckbox" checked>
+    </div>
+    <div class="setting-row">
+        <span>Дата над сообщениями</span>
+        <input type="checkbox" id="showDateCheckbox" checked>
+    </div>
+    <button class="file-button" id="closeSettingsBtn" style="width:100%; margin-top:20px;">Закрыть</button>
+</div>
+
+<script>
+    (function() {
+        // --- элементы DOM ---
+        const fileInput = document.getElementById('fileInput');
+        const myIdInput = document.getElementById('myIdInput');
+        const useOutCheckbox = document.getElementById('useOutCheckbox');
+        const searchInput = document.getElementById('searchInput');
+        const chatContainer = document.getElementById('chatContainer');
+        const messageCountSpan = document.getElementById('messageCount');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const overlay = document.getElementById('overlay');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const themeSelect = document.getElementById('themeSelect');
+        const fontSizeRange = document.getElementById('fontSizeRange');
+        const bubbleWidthRange = document.getElementById('bubbleWidthRange');
+        const showAvatarsCheckbox = document.getElementById('showAvatarsCheckbox');
+        const useEmojiAvatarsCheckbox = document.getElementById('useEmojiAvatarsCheckbox');
+        const showReplyCheckbox = document.getElementById('showReplyCheckbox');
+        const showFwdCheckbox = document.getElementById('showFwdCheckbox');
+        const showDateCheckbox = document.getElementById('showDateCheckbox');
+
+        let allMessages = [];
+        let currentFilteredMessages = [];
+
+        // Настройки
+        const settings = {
+            theme: 'light',
+            fontSize: 15,
+            bubbleWidth: 82,
+            showAvatars: true,
+            useEmojiAvatars: true,
+            showReply: true,
+            showFwd: true,
+            showDate: true,
+        };
+
+        // Коллекция эмодзи для аватаров
+        const avatarEmojis = ['🐱', '🐶', '🐼', '🦊', '🐨', '🐸', '🐙', '🌸', '🎈', '⚽', '🎸', '🍕', '🚀', '🌈', '🐝', '🦄', '🐬', '🍒', '🎃', '🐵'];
+        function getEmojiForId(id) {
+            if (!id) return '👤';
+            const index = Math.abs(parseInt(id) || 0) % avatarEmojis.length;
+            return avatarEmojis[index];
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('vkChatViewerSettings');
+            if (saved) {
+                try { Object.assign(settings, JSON.parse(saved)); } catch(e) {}
+            }
+            applySettingsToUI();
+        }
+        function saveSettings() {
+            localStorage.setItem('vkChatViewerSettings', JSON.stringify(settings));
+        }
+        function applySettingsToUI() {
+            themeSelect.value = settings.theme;
+            fontSizeRange.value = settings.fontSize;
+            bubbleWidthRange.value = settings.bubbleWidth;
+            showAvatarsCheckbox.checked = settings.showAvatars;
+            useEmojiAvatarsCheckbox.checked = settings.useEmojiAvatars;
+            showReplyCheckbox.checked = settings.showReply;
+            showFwdCheckbox.checked = settings.showFwd;
+            showDateCheckbox.checked = settings.showDate;
+            document.body.classList.toggle('dark', settings.theme === 'dark');
+            document.documentElement.style.setProperty('--message-font-size', settings.fontSize + 'px');
+            document.documentElement.style.setProperty('--bubble-max-width', settings.bubbleWidth + '%');
+        }
+
+        function onSettingChange() {
+            settings.theme = themeSelect.value;
+            settings.fontSize = parseInt(fontSizeRange.value);
+            settings.bubbleWidth = parseInt(bubbleWidthRange.value);
+            settings.showAvatars = showAvatarsCheckbox.checked;
+            settings.useEmojiAvatars = useEmojiAvatarsCheckbox.checked;
+            settings.showReply = showReplyCheckbox.checked;
+            settings.showFwd = showFwdCheckbox.checked;
+            settings.showDate = showDateCheckbox.checked;
+            saveSettings();
+            applySettingsToUI();
+            if (allMessages.length > 0) applyFilters();
+        }
+
+        themeSelect.addEventListener('change', onSettingChange);
+        fontSizeRange.addEventListener('input', onSettingChange);
+        bubbleWidthRange.addEventListener('input', onSettingChange);
+        showAvatarsCheckbox.addEventListener('change', onSettingChange);
+        useEmojiAvatarsCheckbox.addEventListener('change', onSettingChange);
+        showReplyCheckbox.addEventListener('change', onSettingChange);
+        showFwdCheckbox.addEventListener('change', onSettingChange);
+        showDateCheckbox.addEventListener('change', onSettingChange);
+
+        settingsBtn.addEventListener('click', () => {
+            settingsPanel.classList.add('open');
+            overlay.classList.add('active');
+        });
+        function closeSettings() {
+            settingsPanel.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+        closeSettingsBtn.addEventListener('click', closeSettings);
+        overlay.addEventListener('click', closeSettings);
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    let messages = [];
+                    if (Array.isArray(json)) messages = json;
+                    else if (json && typeof json === 'object') {
+                        messages = json.messages || json.items || json.response?.items || [];
+                    }
+                    if (!Array.isArray(messages) || messages.length === 0) {
+                        alert('Не удалось найти массив сообщений в JSON.');
+                        return;
+                    }
+                    messages.sort((a, b) => (a.date || 0) - (b.date || 0));
+                    allMessages = messages;
+                    applyFilters();
+                } catch (err) {
+                    alert('Ошибка парсинга JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function applyFilters() {
+            const searchQuery = searchInput.value.trim().toLowerCase();
+            let filtered = allMessages;
+            if (searchQuery) {
+                filtered = allMessages.filter(msg => {
+                    if (msg.text && msg.text.toLowerCase().includes(searchQuery)) return true;
+                    if (msg.reply_message && msg.reply_message.text &&
+                        msg.reply_message.text.toLowerCase().includes(searchQuery)) return true;
+                    if (msg.fwd_messages && msg.fwd_messages.length) {
+                        return msg.fwd_messages.some(fwd => fwd.text && fwd.text.toLowerCase().includes(searchQuery));
+                    }
+                    return false;
+                });
+            }
+            currentFilteredMessages = filtered;
+            renderMessages(filtered);
+            messageCountSpan.textContent = `Показано: ${filtered.length} из ${allMessages.length}`;
+        }
+
+        function isOutgoing(msg) {
+            if (useOutCheckbox.checked) return msg.out === 1;
+            const myId = parseInt(myIdInput.value, 10);
+            if (isNaN(myId)) return false;
+            return msg.from_id === myId;
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+        function formatDate(timestamp) {
+            const date = new Date(timestamp * 1000);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (date.toDateString() === today.toDateString()) return 'Сегодня';
+            if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
+            return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+
+        function getAvatarContent(msg, outgoing) {
+            if (!settings.showAvatars) return '';
+            if (settings.useEmojiAvatars) {
+                if (outgoing) return '⭐';
+                return getEmojiForId(msg.from_id);
+            } else {
+                if (outgoing) return 'Я';
+                const id = msg.from_id ? msg.from_id.toString() : '?';
+                let char = id.charAt(0);
+                if (char === '-') char = id.charAt(1) || 'C';
+                return char.toUpperCase();
+            }
+        }
+
+        // Улучшенное извлечение URL стикера
+        function getStickerUrl(att) {
+            const sticker = att.sticker || {};
+            // 1. images массив (стандарт VK API)
+            if (sticker.images && Array.isArray(sticker.images) && sticker.images.length > 0) {
+                const best = sticker.images.reduce((p, c) => (c.width > p.width ? c : p), sticker.images[0]);
+                if (best.url) return best.url;
+            }
+            // 2. animation_url (анимированный стикер)
+            if (sticker.animation_url) return sticker.animation_url;
+            // 3. images_with_background
+            if (sticker.images_with_background && Array.isArray(sticker.images_with_background) && sticker.images_with_background.length > 0) {
+                const best = sticker.images_with_background.reduce((p, c) => (c.width > p.width ? c : p), sticker.images_with_background[0]);
+                if (best.url) return best.url;
+            }
+            // 4. photo объект с sizes
+            if (sticker.photo && sticker.photo.sizes && Array.isArray(sticker.photo.sizes)) {
+                const best = sticker.photo.sizes.reduce((p, c) => (c.width > p.width ? c : p), sticker.photo.sizes[0]);
+                if (best.url) return best.url;
+            }
+            // 5. прямые поля url / src (нестандартные экспорты)
+            if (sticker.url) return sticker.url;
+            if (sticker.src) return sticker.src;
+            // 6. sticker_id (заглушка-ссылка, но не изображение)
+            if (sticker.sticker_id) {
+                return `https://vk.com/sticker/1-${sticker.sticker_id}-256`; // может не работать
+            }
+            return null;
+        }
+
+        function renderAttachment(att) {
+            if (!att || !att.type) return '';
+            let html = '<div class="attachment">';
+            switch (att.type) {
+                case 'sticker': {
+                    const url = getStickerUrl(att);
+                    if (url) {
+                        html += `<img src="${escapeHtml(url)}" class="sticker-img" alt="sticker" loading="lazy">`;
+                    } else {
+                        html += '✨ Стикер (нет изображения)';
+                    }
+                    break;
+                }
+                case 'photo': {
+                    const photo = att.photo || {};
+                    const sizes = photo.sizes || [];
+                    const best = sizes.length ? sizes[sizes.length-1] : null;
+                    const url = best ? best.url : (photo.photo_604 || photo.photo_130 || '');
+                    html += '📷 Фотография';
+                    if (url) {
+                        html += `<br><img src="${escapeHtml(url)}" alt="photo" loading="lazy" style="max-width:100%; border-radius:8px; margin-top:5px;">`;
+                    }
+                    break;
+                }
+                case 'video': {
+                    html += '🎬 Видео';
+                    const video = att.video || {};
+                    if (video.title) html += `: ${escapeHtml(video.title)}`;
+                    if (video.image || video.first_frame) {
+                        const thumb = video.image || video.first_frame;
+                        if (thumb && thumb.url) html += `<br><img src="${escapeHtml(thumb.url)}" alt="video thumb" style="max-width:100%; border-radius:8px;">`;
+                    }
+                    break;
+                }
+                case 'audio':
+                    html += '🎵 Аудиозапись';
+                    const audio = att.audio || {};
+                    if (audio.title) html += `: ${escapeHtml(audio.artist || '')} - ${escapeHtml(audio.title)}`;
+                    break;
+                case 'doc':
+                    html += '📄 Документ';
+                    const doc = att.doc || {};
+                    if (doc.title) html += `: ${escapeHtml(doc.title)}`;
+                    if (doc.url) html += ` <a href="${escapeHtml(doc.url)}" target="_blank">Скачать</a>`;
+                    break;
+                case 'link':
+                    html += '🔗 Ссылка';
+                    const link = att.link || {};
+                    if (link.url) html += ` <a href="${escapeHtml(link.url)}" target="_blank">${escapeHtml(link.title || link.url)}</a>`;
+                    break;
+                default:
+                    html += `📎 ${escapeHtml(att.type)}`;
+                    break;
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function renderFwdMessages(fwdMessages) {
+            if (!settings.showFwd || !fwdMessages || !fwdMessages.length) return '';
+            let html = '';
+            fwdMessages.forEach(fwd => {
+                html += '<div class="fwd-block">';
+                html += `<span class="mini-avatar">${getEmojiForId(fwd.from_id)}</span> <strong>Пересланное</strong><br>`;
+                if (fwd.text) html += escapeHtml(fwd.text) + '<br>';
+                if (fwd.attachments && fwd.attachments.length) {
+                    fwd.attachments.forEach(att => html += renderAttachment(att));
+                }
+                html += `<small>${formatTime(fwd.date)}</small>`;
+                html += '</div>';
+            });
+            return html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderMessages(messages) {
+            chatContainer.innerHTML = '';
+            if (!messages.length) {
+                chatContainer.innerHTML = '<div class="empty-chat">Нет сообщений для отображения</div>';
+                return;
+            }
+            let lastDate = null;
+            const fragment = document.createDocumentFragment();
+
+            messages.forEach((msg, index) => {
+                const msgDate = msg.date ? new Date(msg.date * 1000).toDateString() : null;
+                if (settings.showDate && msgDate && msgDate !== lastDate) {
+                    const sep = document.createElement('div');
+                    sep.className = 'date-separator';
+                    sep.textContent = formatDate(msg.date);
+                    fragment.appendChild(sep);
+                    lastDate = msgDate;
+                }
+
+                const outgoing = isOutgoing(msg);
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-wrapper ${outgoing ? 'out' : 'in'}`;
+                wrapper.style.maxWidth = settings.bubbleWidth + '%';
+                wrapper.style.transitionDelay = `${Math.min(index * 15, 300)}ms`;
+
+                const row = document.createElement('div');
+                row.className = 'message-row';
+
+                // Аватар
+                if (settings.showAvatars) {
+                    const avatar = document.createElement('div');
+                    avatar.className = `avatar ${outgoing ? 'out' : 'in'}`;
+                    avatar.textContent = getAvatarContent(msg, outgoing);
+                    avatar.title = `ID: ${msg.from_id || '?'}`;
+                    row.appendChild(avatar);
+                }
+
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+
+                // Reply с эмодзи автора
+                if (settings.showReply && msg.reply_message) {
+                    const replyDiv = document.createElement('div');
+                    replyDiv.className = 'reply-block';
+                    const replyEmoji = getEmojiForId(msg.reply_message.from_id);
+                    replyDiv.innerHTML = `<span class="mini-avatar">${replyEmoji}</span> <span>${escapeHtml(msg.reply_message.text || '')}</span>`;
+                    bubble.appendChild(replyDiv);
+                }
+
+                if (msg.text) {
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = msg.text;
+                    bubble.appendChild(textSpan);
+                }
+
+                if (msg.attachments && msg.attachments.length) {
+                    msg.attachments.forEach(att => {
+                        const attHtml = renderAttachment(att);
+                        if (attHtml) {
+                            const attDiv = document.createElement('div');
+                            attDiv.innerHTML = attHtml;
+                            bubble.appendChild(attDiv);
+                        }
+                    });
+                }
+
+                if (settings.showFwd && msg.fwd_messages && msg.fwd_messages.length) {
+                    const fwdHtml = renderFwdMessages(msg.fwd_messages);
+                    const fwdDiv = document.createElement('div');
+                    fwdDiv.innerHTML = fwdHtml;
+                    bubble.appendChild(fwdDiv);
+                }
+
+                row.appendChild(bubble);
+                wrapper.appendChild(row);
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'time';
+                timeDiv.textContent = formatTime(msg.date);
+                wrapper.appendChild(timeDiv);
+
+                fragment.appendChild(wrapper);
+            });
+
+            chatContainer.appendChild(fragment);
+
+            // Анимация появления через requestAnimationFrame
+            requestAnimationFrame(() => {
+                const wrappers = chatContainer.querySelectorAll('.message-wrapper');
+                wrappers.forEach(w => w.classList.add('reveal'));
+            });
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        searchInput.addEventListener('input', applyFilters);
+        useOutCheckbox.addEventListener('change', applyFilters);
+        myIdInput.addEventListener('input', () => { if (!useOutCheckbox.checked) applyFilters(); });
+        myIdInput.addEventListener('change', () => { if (!useOutCheckbox.checked) applyFilters(); });
+
+        loadSettings();
+        applySettingsToUI();
+    })();
+</script>
+</body>
+</html>
